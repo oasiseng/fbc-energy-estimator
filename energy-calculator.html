@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oasis Energy Estimator - Preliminary R405 Load Calculator for Florida Projects</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for better UI/UX */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .input-group {
+            @apply mb-4;
+        }
+        .input-group label {
+            @apply block text-sm font-medium text-gray-700 mb-1;
+        }
+        .input-group input, .input-group select {
+            @apply w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500;
+        }
+        .btn {
+            @apply inline-block w-auto py-3 px-6 text-white font-bold tracking-wide rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-150 ease-in-out;
+        }
+        .btn:hover {
+            @apply shadow-lg transform -translate-y-0.5;
+        }
+        .btn:active {
+            @apply shadow-sm transform translate-y-0;
+        }
+        .btn-full {
+             @apply w-full;
+        }
+        .btn-primary {
+            @apply bg-gradient-to-br from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 focus:ring-indigo-500;
+        }
+        .btn-secondary {
+            @apply bg-gradient-to-br from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 focus:ring-gray-500;
+        }
+        .result-card {
+            @apply bg-white p-6 rounded-lg shadow-lg mt-8 border;
+        }
+        .result-table th, .result-table td {
+            @apply px-4 py-2 text-left border-b;
+        }
+        #epl-result.pass {
+            @apply text-green-600 font-bold;
+        }
+        #epl-result.fail {
+            @apply text-red-600 font-bold;
+        }
+        .alert-box {
+            @apply mt-6 p-4 rounded-md border text-sm;
+        }
+        .alert-success {
+            @apply bg-green-50 border-green-500 text-green-800;
+        }
+        .alert-warning {
+            @apply bg-yellow-50 border-yellow-500 text-yellow-800;
+        }
+        .disclaimer-footer {
+            @apply mt-12 pt-6 border-t text-xs text-gray-500;
+        }
+        .disclaimer-footer h4 {
+            @apply font-bold text-gray-700 mb-2;
+        }
+        .disclaimer-footer ul {
+            @apply list-disc list-inside pl-4;
+        }
+        details > summary {
+            @apply list-none cursor-pointer;
+        }
+        details > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        /* Print-specific styles */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #print-section, #print-section * {
+                visibility: visible;
+            }
+            #print-section {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .no-print {
+                display: none;
+            }
+            .print-disclaimer {
+                page-break-before: auto;
+            }
+        }
+        @import url('https://rsms.me/inter/inter.css');
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-4xl">
+        <!-- Header -->
+        <div class="text-center mb-6">
+            <h1 class="text-4xl font-extrabold text-gray-800">Oasis Energy Estimator</h1>
+            <p class="text-lg text-gray-600 mt-1">Preliminary R405 Load Calculator for Florida Projects</p>
+        </div>
+
+        <!-- Instructions Section -->
+        <div class="bg-white p-5 rounded-lg shadow-md border border-gray-200 mb-6 no-print">
+            <details>
+                <summary class="font-semibold text-lg text-indigo-700 flex justify-between items-center">
+                    <span>Instructions & Code Basis</span>
+                    <svg class="w-5 h-5 transition-transform transform" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                </summary>
+                <div class="mt-4 text-gray-600 text-sm space-y-3">
+                    <p><strong class="font-semibold text-gray-800">How to Use This Tool:</strong></p>
+                    <ol class="list-decimal list-inside space-y-2 pl-2">
+                        <li><strong>Enter Project Data:</strong> Fill in all the fields below with your project's specifications. The form is pre-filled with common values to get you started.</li>
+                        <li><strong>Calculate Results:</strong> Click the "Calculate Results" button at the bottom of the form.</li>
+                        <li><strong>Review Your Report:</strong> The tool will instantly generate a report showing your EPL compliance score, an HVAC sizing check, and a detailed load calculation summary.</li>
+                        <li><strong>Save or Print:</strong> Use the buttons at the bottom of the report to save a JSON file of your inputs or print a clean, PDF-ready version of the report.</li>
+                    </ol>
+                    <p><strong class="font-semibold text-gray-800">Code Basis:</strong></p>
+                    <p>This calculator uses simplified equations based on the principles of the <strong class="text-gray-900">Florida Building Code, 8th Edition (2023), Energy Conservation, Section R405 (Simulated Performance Alternative)</strong> and ACCA Manual J. It is intended for preliminary estimation only.</p>
+                </div>
+            </details>
+        </div>
+
+
+        <!-- Input Form -->
+        <div id="input-form" class="bg-white p-6 rounded-lg shadow-md">
+            <form id="energy-form">
+                <fieldset class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <legend class="text-xl font-semibold text-gray-900 w-full col-span-1 md:col-span-2 mb-4 border-b pb-2">Project Information</legend>
+                    <div class="input-group">
+                        <label for="address">Project Address</label>
+                        <input type="text" id="address" value="123 Main St, Anytown, FL">
+                    </div>
+                    <div class="input-group">
+                        <label for="climateZone">Climate Zone</label>
+                        <select id="climateZone">
+                            <option value="2" selected>CZ 2 (North/Central FL)</option>
+                            <option value="1">CZ 1 (South FL)</option>
+                        </select>
+                    </div>
+                </fieldset>
+
+                <fieldset class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                    <legend class="text-xl font-semibold text-gray-900 w-full col-span-1 md:col-span-2 mb-4 border-b pb-2">Building Geometry</legend>
+                    <div class="input-group">
+                        <label for="cfa">Conditioned Floor Area (ft²)</label>
+                        <input type="number" id="cfa" value="1800" min="100" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="ceilingHeight">Average Ceiling Height (ft)</label>
+                        <input type="number" id="ceilingHeight" value="8" min="6" required>
+                    </div>
+                     <div class="input-group">
+                        <label for="wallArea">Gross Wall Area (ft²)</label>
+                        <input type="number" id="wallArea" value="1200" min="100" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="roofArea">Roof/Ceiling Area (ft²)</label>
+                        <input type="number" id="roofArea" value="1800" min="100" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="bedrooms">Number of Bedrooms</label>
+                        <input type="number" id="bedrooms" value="3" min="1" required>
+                    </div>
+                </fieldset>
+
+                <fieldset class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                    <legend class="text-xl font-semibold text-gray-900 w-full col-span-1 md:col-span-2 mb-4 border-b pb-2">Envelope Components</legend>
+                     <div class="input-group">
+                        <label for="wallRValue">Wall Insulation (R-Value)</label>
+                        <input type="number" id="wallRValue" value="4" step="0.1" min="0.1" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="ceilingRValue">Ceiling Insulation (R-Value)</label>
+                        <input type="number" id="ceilingRValue" value="30" step="0.1" min="1" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="windowArea">Total Window Area (ft²)</label>
+                        <input type="number" id="windowArea" value="200" min="0" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="windowUValue">Window U-Value</label>
+                        <input type="number" id="windowUValue" value="0.40" step="0.01" min="0.1" required>
+                    </div>
+                     <div class="input-group">
+                        <label for="windowSHGC">Window SHGC</label>
+                        <input type="number" id="windowSHGC" value="0.25" step="0.01" min="0.1" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="doorArea">Total Door Area (ft²)</label>
+                        <input type="number" id="doorArea" value="40" min="0" required>
+                    </div>
+                    <!-- NEW: Door U-Value Input -->
+                    <div class="input-group">
+                        <label for="doorUValue">Door U-Value</label>
+                        <input type="number" id="doorUValue" value="0.40" step="0.01" min="0.1" required>
+                    </div>
+                    <!-- NEW: Floor Inputs -->
+                    <div class="input-group">
+                        <label for="floorType">Floor Type</label>
+                        <select id="floorType">
+                            <option value="slab" selected>Slab-on-Grade</option>
+                            <option value="raised">Raised/Wood Frame</option>
+                        </select>
+                    </div>
+                     <div class="input-group" id="floor-r-value-group">
+                        <label for="floorRValue">Floor Insulation (R-Value)</label>
+                        <input type="number" id="floorRValue" value="0" step="0.1" min="0" required>
+                    </div>
+                </fieldset>
+
+                <fieldset class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                    <legend class="text-xl font-semibold text-gray-900 w-full col-span-1 md:col-span-2 mb-4 border-b pb-2">Systems</legend>
+                     <div class="input-group">
+                        <label for="ach50">Air Infiltration (ACH50)</label>
+                        <input type="number" id="ach50" value="5" step="0.1" min="1" required>
+                    </div>
+                    <!-- NEW: Ventilation Input -->
+                    <div class="input-group">
+                        <label for="ventCFM">Mechanical Ventilation (CFM)</label>
+                        <input type="number" id="ventCFM" value="0" step="1" min="0" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="ductLocation">Duct Location</label>
+                        <select id="ductLocation">
+                            <option value="attic" selected>Attic</option>
+                            <option value="conditioned">Conditioned Space</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="seer2">HVAC Cooling (SEER2)</label>
+                        <input type="number" id="seer2" value="15" step="0.1" min="14" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="hspf2">HVAC Heating (HSPF2)</label>
+                        <input type="number" id="hspf2" value="8.5" step="0.1" min="8.2" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="coolCapacity">HVAC Cooling Capacity (Btuh)</label>
+                        <input type="number" id="coolCapacity" value="24000" step="100" min="0" required>
+                    </div>
+                    <!-- NEW: Water Heater Input -->
+                    <div class="input-group md:col-span-2">
+                        <label for="waterHeaterEF">Water Heater Energy Factor (EF)</label>
+                        <input type="number" id="waterHeaterEF" value="0.95" step="0.01" min="0.5" required>
+                    </div>
+                </fieldset>
+
+                <div class="mt-8 p-4 bg-slate-50 border rounded-lg">
+                    <button type="button" id="calculate-btn" class="btn btn-primary btn-full">Calculate Results</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Results Section (Initially hidden) -->
+        <div id="results-section" class="hidden mt-8">
+            <div id="print-section">
+                <div class="result-card">
+                    <h2 class="text-2xl font-bold text-center text-gray-800 mb-4">Compliance Report</h2>
+                    <p class="text-center text-gray-500 mb-6" id="report-date"></p>
+
+                    <!-- Compliance Summary -->
+                     <div class="text-center p-4 rounded-lg border" id="compliance-summary-box">
+                        <p class="text-lg font-medium text-gray-700">Compliance Status:</p>
+                        <p class="text-4xl font-bold" id="epl-result">--</p>
+                        <p class="text-md text-gray-600 mt-1" id="epl-score-text"></p>
+                    </div>
+
+                    <!-- HVAC Sizing (Manual S) Check -->
+                    <div id="hvac-sizing-check" class="alert-box hidden"></div>
+
+                    <!-- NEW: Annual Energy Use Breakdown -->
+                    <h3 class="text-xl font-semibold text-gray-900 mt-8 mb-2">Annual Energy Use Breakdown (kWh/yr)</h3>
+                     <div class="overflow-x-auto">
+                        <table class="w-full text-sm result-table mb-6">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="w-1/3">Energy Component</th>
+                                    <th>Proposed Design</th>
+                                    <th>Baseline Design</th>
+                                </tr>
+                            </thead>
+                            <tbody id="energy-table-body"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Load Calculation Summary -->
+                    <h3 class="text-xl font-semibold text-gray-900 mt-8 mb-2">Peak Load Calculation Summary (Btuh)</h3>
+                     <div class="overflow-x-auto">
+                        <table class="w-full text-sm result-table">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="w-1/3">Load Component</th>
+                                    <th>Proposed Design</th>
+                                    <th>Baseline Design</th>
+                                </tr>
+                            </thead>
+                            <tbody id="load-table-body"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Disclaimer for Print -->
+                    <div class="disclaimer-footer print-disclaimer">
+                        <h4>⚠️ LEGAL DISCLAIMER</h4>
+                        <p>This tool is provided for informational and preliminary design purposes only. It does not constitute official energy code compliance documentation under the Florida Building Code (FBC) or any AHJ (Authority Having Jurisdiction). This calculator simulates aspects of the R405 Simulated Performance Method and basic Manual J load calculations using public domain methods and conservative default values.</p>
+                        <p class="mt-2">It is not a substitute for:</p>
+                        <ul>
+                            <li>EnergyGauge-certified simulations</li>
+                            <li>HERS Rater or PE-signed energy reports</li>
+                            <li>Manual S equipment selection</li>
+                            <li>Required blower door or duct leakage test results</li>
+                        </ul>
+                        <p class="mt-2">Users assume all liability for interpretation, submission, or construction based on this tool.</p>
+                    </div>
+                </div>
+            </div>
+            <!-- UPDATED: Button Box for Report Actions -->
+            <div class="no-print mt-8 p-6 bg-slate-100 rounded-xl shadow-md border">
+                <h3 class="text-center font-bold text-gray-700 mb-4">Report Actions</h3>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                     <button type="button" id="save-btn" class="btn btn-secondary w-full sm:w-auto">Save Project (JSON)</button>
+                     <button type="button" id="print-btn" class="btn btn-secondary w-full sm:w-auto">Print Report (PDF)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Disclaimer for Web View -->
+        <div class="disclaimer-footer no-print" id="web-disclaimer">
+            <h4>⚠️ LEGAL DISCLAIMER</h4>
+            <p>This tool is provided for informational and preliminary design purposes only. It does not constitute official energy code compliance documentation under the Florida Building Code (FBC) or any AHJ (Authority Having Jurisdiction). This calculator simulates aspects of the R405 Simulated Performance Method and basic Manual J load calculations using public domain methods and conservative default values.</p>
+            <p class="mt-2">It is not a substitute for:</p>
+            <ul>
+                <li>EnergyGauge-certified simulations</li>
+                <li>HERS Rater or PE-signed energy reports</li>
+                <li>Manual S equipment selection</li>
+                <li>Required blower door or duct leakage test results</li>
+            </ul>
+            <p class="mt-2">Users assume all liability for interpretation, submission, or construction based on this tool.</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const calculateBtn = document.getElementById('calculate-btn');
+            const printBtn = document.getElementById('print-btn');
+            const saveBtn = document.getElementById('save-btn');
+            const floorTypeSelect = document.getElementById('floorType');
+            const floorRValueGroup = document.getElementById('floor-r-value-group');
+            
+            calculateBtn.addEventListener('click', calculateAndDisplayResults);
+            printBtn.addEventListener('click', () => window.print());
+            saveBtn.addEventListener('click', saveInputsToJson);
+
+            // Show/hide floor R-value based on type
+            floorTypeSelect.addEventListener('change', () => {
+                floorRValueGroup.style.display = floorTypeSelect.value === 'raised' ? 'block' : 'none';
+            });
+            floorRValueGroup.style.display = 'none'; // Initially hide
+
+            // Toggle for instructions
+            const details = document.querySelector("details");
+            details.addEventListener("toggle", event => {
+                const svg = details.querySelector("svg");
+                if (details.open) {
+                    svg.style.transform = "rotate(180deg)";
+                } else {
+                    svg.style.transform = "";
+                }
+            });
+
+            function getInputs() {
+                return {
+                    address: document.getElementById('address').value,
+                    climateZone: parseInt(document.getElementById('climateZone').value),
+                    cfa: parseFloat(document.getElementById('cfa').value),
+                    ceilingHeight: parseFloat(document.getElementById('ceilingHeight').value),
+                    wallArea: parseFloat(document.getElementById('wallArea').value),
+                    roofArea: parseFloat(document.getElementById('roofArea').value),
+                    bedrooms: parseInt(document.getElementById('bedrooms').value),
+                    wallRValue: parseFloat(document.getElementById('wallRValue').value),
+                    ceilingRValue: parseFloat(document.getElementById('ceilingRValue').value),
+                    windowArea: parseFloat(document.getElementById('windowArea').value),
+                    windowUValue: parseFloat(document.getElementById('windowUValue').value),
+                    windowSHGC: parseFloat(document.getElementById('windowSHGC').value),
+                    doorArea: parseFloat(document.getElementById('doorArea').value),
+                    doorUValue: parseFloat(document.getElementById('doorUValue').value), // NEW
+                    floorType: document.getElementById('floorType').value, // NEW
+                    floorRValue: parseFloat(document.getElementById('floorRValue').value), // NEW
+                    ach50: parseFloat(document.getElementById('ach50').value),
+                    ventCFM: parseFloat(document.getElementById('ventCFM').value), // NEW
+                    ductLocation: document.getElementById('ductLocation').value,
+                    seer2: parseFloat(document.getElementById('seer2').value),
+                    hspf2: parseFloat(document.getElementById('hspf2').value),
+                    coolCapacity: parseFloat(document.getElementById('coolCapacity').value),
+                    waterHeaterEF: parseFloat(document.getElementById('waterHeaterEF').value) // NEW
+                };
+            }
+
+            function saveInputsToJson() {
+                const inputs = getInputs();
+                const blob = new Blob([JSON.stringify(inputs, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'oasis-energy-estimator-project.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            function calculateAndDisplayResults() {
+                const inputs = getInputs();
+                
+                const constants = {
+                    // Climate data
+                    cz2: { coolDB: 91, heatDB: 37, indoorDB: 75, grainsDelta: 20, eflhCool: 2000, eflhHeat: 600 },
+                    cz1: { coolDB: 92, heatDB: 46, indoorDB: 75, grainsDelta: 20, eflhCool: 2500, eflhHeat: 400 },
+                    // Baseline specs from FBC R405.3
+                    baseline: {
+                        ceilingR: 30,
+                        wallR: 13,
+                        floorR: 19, // For raised floors
+                        windowU: 0.40,
+                        windowSHGC: 0.25,
+                        doorU: 0.40,
+                        ach50: 5,
+                        ductR: 8,
+                        seer2: 14.0,
+                        hspf2: 8.2,
+                        waterHeaterEF: 0.95
+                    },
+                    // Physics & Manual J constants
+                    roofCoolDeltaT: 36,
+                    ductLossFactor: 0.15,
+                    SHGF: 175, // Btuh/ft², average solar heat gain factor for peak load
+                    occupantLatentLoad: 200 // Btuh/person
+                };
+
+                const design = inputs.climateZone === 1 ? constants.cz1 : constants.cz2;
+                const coolDeltaT = design.coolDB - design.indoorDB;
+                const heatDeltaT = design.indoorDB - design.heatDB;
+
+                // Calculate peak loads for both designs
+                const proposedLoads = calculatePeakLoads(inputs, constants, design, coolDeltaT, heatDeltaT, false);
+                const baselineLoads = calculatePeakLoads(inputs, constants, design, coolDeltaT, heatDeltaT, true);
+                
+                // Calculate annual energy for both designs
+                const proposedEnergy = calculateAnnualEnergy(proposedLoads, inputs, design);
+                const baselineEnergy = calculateAnnualEnergy(baselineLoads, { ...inputs, seer2: constants.baseline.seer2, hspf2: constants.baseline.hspf2, waterHeaterEF: constants.baseline.waterHeaterEF }, design);
+
+                // Calculate final EPL score
+                const eplScore = (proposedEnergy.total / baselineEnergy.total) * 100;
+
+                updateUI(inputs, proposedLoads, baselineLoads, proposedEnergy, baselineEnergy, eplScore, constants);
+            }
+
+            function calculatePeakLoads(inputs, constants, design, coolDeltaT, heatDeltaT, isBaseline) {
+                // Determine which specs to use for the calculation
+                const spec = {
+                    wallU: 1 / (isBaseline ? constants.baseline.wallR : inputs.wallRValue),
+                    ceilingU: 1 / (isBaseline ? constants.baseline.ceilingR : inputs.ceilingRValue),
+                    floorU: 1 / (isBaseline ? constants.baseline.floorR : (inputs.floorRValue > 0 ? inputs.floorRValue : Infinity)),
+                    windowU: isBaseline ? constants.baseline.windowU : inputs.windowUValue,
+                    windowSHGC: isBaseline ? constants.baseline.windowSHGC : inputs.windowSHGC,
+                    doorU: isBaseline ? constants.baseline.doorU : inputs.doorUValue,
+                    ach50: isBaseline ? constants.baseline.ach50 : inputs.ach50,
+                    ventCFM: inputs.ventCFM, // Per R405, ventilation is same as proposed
+                    ductLoss: (isBaseline || inputs.ductLocation === 'attic') ? constants.ductLossFactor : 0,
+                };
+
+                const loads = {};
+                const occupants = inputs.bedrooms + 1;
+                
+                // --- COOLING LOADS (Btuh) ---
+                // Conduction Gains
+                loads.ceilingCond = spec.ceilingU * inputs.roofArea * constants.roofCoolDeltaT;
+                loads.wallCond = spec.wallU * inputs.wallArea * coolDeltaT;
+                loads.windowCond = spec.windowU * inputs.windowArea * coolDeltaT;
+                loads.doorCond = spec.doorU * inputs.doorArea * coolDeltaT;
+                loads.floorCond = (inputs.floorType === 'raised') ? spec.floorU * inputs.cfa * coolDeltaT : 0;
+
+                // Solar Gains (FIXED: using SHGF constant instead of arbitrary multiplier)
+                loads.solar = spec.windowSHGC * inputs.windowArea * constants.SHGF;
+                
+                // Infiltration & Ventilation Gains
+                const volume = inputs.cfa * inputs.ceilingHeight;
+                const naturalCFM = ((spec.ach50 * volume) / 60) / 20; // N-Factor approximation
+                loads.infilSensible = 1.1 * naturalCFM * coolDeltaT;
+                loads.infilLatent = 0.68 * naturalCFM * design.grainsDelta;
+                loads.ventSensible = 1.1 * spec.ventCFM * coolDeltaT;
+                loads.ventLatent = 0.68 * spec.ventCFM * design.grainsDelta;
+
+                // Internal Gains
+                loads.internalSensible = 1600 + (occupants * 200) + 1200; // Base + occupants + appliances
+                loads.internalLatent = occupants * constants.occupantLatentLoad; // NEW: Latent from occupants
+
+                // Totals
+                const totalSensibleBeforeDucts = loads.ceilingCond + loads.wallCond + loads.windowCond + loads.doorCond + loads.floorCond + loads.solar + loads.infilSensible + loads.ventSensible + loads.internalSensible;
+                loads.ductGains = totalSensibleBeforeDucts * spec.ductLoss;
+                
+                loads.totalSensible = totalSensibleBeforeDucts + loads.ductGains;
+                loads.totalLatent = loads.infilLatent + loads.ventLatent + loads.internalLatent;
+                loads.totalCooling = loads.totalSensible + loads.totalLatent;
+
+                // --- HEATING LOAD (Btuh) ---
+                // Heat loss is conduction + infiltration/ventilation
+                const heatLossConduction = (spec.ceilingU * inputs.roofArea * heatDeltaT) +
+                                     (spec.wallU * inputs.wallArea * heatDeltaT) +
+                                     (spec.windowU * inputs.windowArea * heatDeltaT) +
+                                     (spec.doorU * inputs.doorArea * heatDeltaT) +
+                                     ((inputs.floorType === 'raised') ? spec.floorU * inputs.cfa * heatDeltaT : 0);
+                const heatLossInfilVent = 1.1 * (naturalCFM + spec.ventCFM) * heatDeltaT;
+                const totalHeatLossBeforeDucts = heatLossConduction + heatLossInfilVent;
+                loads.totalHeating = totalHeatLossBeforeDucts * (1 + spec.ductLoss); // Account for duct loss in heating too
+
+                return loads;
+            }
+
+            function calculateAnnualEnergy(loads, hvacInputs, design) {
+                const energy = {};
+                // Convert peak loads to annual kWh using Equivalent Full Load Hours
+                energy.cooling = (loads.totalCooling * design.eflhCool) / (hvacInputs.seer2 * 1000);
+                energy.heating = (loads.totalHeating * design.eflhHeat) / (hvacInputs.hspf2 * 1000);
+
+                // Estimate DHW and Lighting kWh
+                // Based on BA Benchmark for new homes, DHW ~20% of total energy. A simple formula:
+                energy.dhw = (1000 + (hvacInputs.bedrooms * 400)) / hvacInputs.waterHeaterEF;
+                energy.lighting = 0.8 * hvacInputs.cfa; // Approx 0.8 kWh/sqft/yr
+
+                energy.total = energy.cooling + energy.heating + energy.dhw + energy.lighting;
+                return energy;
+            }
+
+            function updateUI(inputs, proposedLoads, baselineLoads, proposedEnergy, baselineEnergy, eplScore, constants) {
+                const f = (num) => num.toLocaleString(undefined, { maximumFractionDigits: 0 });
+                
+                document.getElementById('report-date').textContent = `Report generated on: ${new Date().toLocaleDateString()}`;
+
+                // Update Compliance Summary
+                const eplResultEl = document.getElementById('epl-result');
+                const eplScoreTextEl = document.getElementById('epl-score-text');
+                const summaryBox = document.getElementById('compliance-summary-box');
+
+                eplScoreTextEl.textContent = `EPL Score: ${eplScore.toFixed(1)}`;
+                if (eplScore <= 100) {
+                    eplResultEl.textContent = 'PASS';
+                    eplResultEl.className = 'pass text-4xl font-bold';
+                    summaryBox.classList.remove('bg-red-100', 'border-red-500');
+                    summaryBox.classList.add('bg-green-100', 'border-green-500');
+                } else {
+                    eplResultEl.textContent = 'FAIL';
+                    eplResultEl.className = 'fail text-4xl font-bold';
+                    summaryBox.classList.remove('bg-green-100', 'border-green-500');
+                    summaryBox.classList.add('bg-red-100', 'border-red-500');
+                }
+
+                // Update HVAC Sizing Check
+                const hvacCheckEl = document.getElementById('hvac-sizing-check');
+                const lowerBound = proposedLoads.totalCooling;
+                const upperBound = proposedLoads.totalCooling * 1.15;
+                if (inputs.coolCapacity >= lowerBound && inputs.coolCapacity <= upperBound) {
+                    hvacCheckEl.className = 'alert-box alert-success';
+                    hvacCheckEl.innerHTML = `<strong class="font-bold">HVAC Sizing: PASS.</strong> Your system capacity of ${f(inputs.coolCapacity)} Btuh is correctly sized for the calculated cooling load of ${f(proposedLoads.totalCooling)} Btuh.`;
+                } else {
+                    hvacCheckEl.className = 'alert-box alert-warning';
+                    hvacCheckEl.innerHTML = `<strong class="font-bold">HVAC Sizing: WARNING.</strong> Your system capacity of ${f(inputs.coolCapacity)} Btuh is outside the recommended range for the calculated cooling load of ${f(proposedLoads.totalCooling)} Btuh. Recommended capacity is between ${f(lowerBound)} and ${f(upperBound)} Btuh.`;
+                }
+                hvacCheckEl.classList.remove('hidden');
+
+                // NEW: Populate Annual Energy Table
+                const energyTable = document.getElementById('energy-table-body');
+                energyTable.innerHTML = `
+                    <tr><td>Cooling</td><td>${f(proposedEnergy.cooling)}</td><td>${f(baselineEnergy.cooling)}</td></tr>
+                    <tr><td>Heating</td><td>${f(proposedEnergy.heating)}</td><td>${f(baselineEnergy.heating)}</td></tr>
+                    <tr><td>Hot Water (DHW)</td><td>${f(proposedEnergy.dhw)}</td><td>${f(baselineEnergy.dhw)}</td></tr>
+                    <tr><td>Lighting</td><td>${f(proposedEnergy.lighting)}</td><td>${f(baselineEnergy.lighting)}</td></tr>
+                    <tr class="font-bold bg-gray-50"><td>Total Annual Energy</td><td>${f(proposedEnergy.total)}</td><td>${f(baselineEnergy.total)}</td></tr>
+                `;
+
+                // Populate Load Table
+                const loadTable = document.getElementById('load-table-body');
+                loadTable.innerHTML = `
+                    <tr><td>Envelope Gains (Conduction)</td><td>${f(proposedLoads.ceilingCond + proposedLoads.wallCond + proposedLoads.windowCond + proposedLoads.doorCond + proposedLoads.floorCond)}</td><td>${f(baselineLoads.ceilingCond + baselineLoads.wallCond + baselineLoads.windowCond + baselineLoads.doorCond + baselineLoads.floorCond)}</td></tr>
+                    <tr><td>Solar Gains</td><td>${f(proposedLoads.solar)}</td><td>${f(baselineLoads.solar)}</td></tr>
+                    <tr><td>Infiltration & Vent Gains</td><td>${f(proposedLoads.infilSensible + proposedLoads.infilLatent + proposedLoads.ventSensible + proposedLoads.ventLatent)}</td><td>${f(baselineLoads.infilSensible + baselineLoads.infilLatent + baselineLoads.ventSensible + baselineLoads.ventLatent)}</td></tr>
+                    <tr><td>Internal Gains</td><td>${f(proposedLoads.internalSensible + proposedLoads.internalLatent)}</td><td>${f(baselineLoads.internalSensible + baselineLoads.internalLatent)}</td></tr>
+                    <tr><td>Duct Gains</td><td>${f(proposedLoads.ductGains)}</td><td>${f(baselineLoads.ductGains)}</td></tr>
+                    <tr class="font-bold bg-gray-50"><td>Total Cooling Load</td><td>${f(proposedLoads.totalCooling)}</td><td>${f(baselineLoads.totalCooling)}</td></tr>
+                    <tr class="font-bold bg-gray-50"><td>Total Heating Load</td><td>${f(proposedLoads.totalHeating)}</td><td>${f(baselineLoads.totalHeating)}</td></tr>
+                `;
+
+                // Show the results
+                document.getElementById('results-section').classList.remove('hidden');
+                document.getElementById('web-disclaimer').classList.add('hidden');
+                document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    </script>
+
+</body>
+</html>
